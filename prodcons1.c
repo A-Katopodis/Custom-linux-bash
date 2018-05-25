@@ -195,7 +195,7 @@ void* produce(void* t){
             }
 
         cb_push_back(cb,&number);
-        printf("Producer %d: Created and pushed random number %d \n",threadId,number);
+        //printf("Producer %d: Created and pushed random number %d \n",threadId,number);
 
         rc = pthread_mutex_unlock(&cb_producer_mutex);
         if (rc != 0) {
@@ -281,7 +281,6 @@ void* consume(void* t){
 
     // while true
     while (1){
-        printf("WTF");
         /* Insert into the buffer*/
         /********************************************/
         rc = pthread_mutex_lock(&cb_consumer_mutex);
@@ -341,7 +340,7 @@ void* consume(void* t){
                 /*Avoiding the fact that consumer n finished the process and other consumers where waiting for their turn to leave
                  * the while loop.
                  * */
-                printf("%d %d",popCount, numbers_to_produce*producers_count);
+                //printf("%d %d",popCount, numbers_to_produce*producers_count);
 
                 if(popCount == numbers_to_produce*producers_count){
 
@@ -362,7 +361,7 @@ void* consume(void* t){
         cb_pop_front(cb,&number);
 
 
-        printf("Consumer: %d: Poped number %d! \n",*threadId,number);
+        //printf("Consumer: %d: Poped number %d! \n",*threadId,number);
 
 
         /*Update the pop count for all the consumers*/
