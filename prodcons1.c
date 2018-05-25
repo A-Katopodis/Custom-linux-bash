@@ -6,23 +6,31 @@
 #include "prodcons1.h"
 
 circular_buffer* cb;
-pthread_mutex_t producerMutex;
-pthread_mutex_t consumerMutex;
 pthread_mutex_t currentSizeMutex;
+pthread_mutex_t cb_consumer_mutex;
+pthread_mutex_t cb_producer_mutex;
+pthread_mutex_t popout_mutex;
+pthread_mutex_t print_mutex;
+
 
 
 pthread_cond_t cbNotEmpty;
 pthread_cond_t cbNotFull;
-int producers_count;
-int popIndex = 0;
-int numbers_to_produce;
-int producersFinished = 0;
+pthread_cond_t printingEnded;
 
-int pushCount = 0;
+int printCount = 0;
+
+
+int producers_count;
+int numbers_to_produce;
+int* producer_numbers_to_output;
 int popCount = 0;
 
 int currentSize = 0;
 int buffer_size;
+int consumers_count;
+
+
 typedef struct producerParameters{
     int threadId;
     int numbers_to_produce;
@@ -115,9 +123,7 @@ void printArguments(int argc, char* argv[]){
     int i = 0;
     for (i = 0; i < argc; i++)
         printf("\n%s", argv[i]);
-
 }
-
 
 
 void* produce(void* t){
@@ -136,40 +142,66 @@ void* produce(void* t){
 
         /* Check if the buffer is full and wait for signal */
         /********************************************/
-        rc = pthread_mutex_lock(&producerMutex);
-        if (rc != 0) {
-            printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-            pthread_exit(&rc);
-        }
 
-
-        while (currentSize == buffer_size){
-            rc = pthread_cond_wait(&cbNotFull, &producerMutex);
-            if (rc != 0) {
-                printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
-                pthread_exit(&rc);
-            }
-        }
-
-        rc = pthread_mutex_unlock(&producerMutex);
-        if (rc != 0) {
-            printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
-            pthread_exit(&rc);
-        }
         /********************************************/
 
 
 
         /* Insert into the buffer*/
         /********************************************/
-        rc = pthread_mutex_lock(&producerMutex);
+        rc = pthread_mutex_lock(&cb_producer_mutex);
         if (rc != 0) {
             printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
             pthread_exit(&rc);
         }
 
+            rc = pthread_mutex_lock(&currentSizeMutex);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+
+            // CurrentSize is shared among all threads
+            // So each time we compare we must define a mutex
+            while (currentSize == buffer_size){
+                printf("Producer %d: Is going to wait ",threadId);
+
+                rc = pthread_mutex_unlock(&currentSizeMutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+
+                rc = pthread_cond_wait(&cbNotFull, &cb_producer_mutex);
+
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+
+
+                rc = pthread_mutex_lock(&currentSizeMutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+
+            }
+
+            rc = pthread_mutex_unlock(&currentSizeMutex);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+
         cb_push_back(cb,&number);
         printf("Producer %d: Created and pushed random number %d \n",threadId,number);
+
+        rc = pthread_mutex_unlock(&cb_producer_mutex);
+        if (rc != 0) {
+            printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+            pthread_exit(&rc);
+        }
 
         rc = pthread_mutex_lock(&currentSizeMutex);
         if (rc != 0) {
@@ -178,8 +210,14 @@ void* produce(void* t){
         }
 
 
-        currentSize++;
-        printf("Producer %d: Current size is %d \n",threadId,currentSize);
+            currentSize++;
+            //printf("Producer %d: Current size is %d \n",threadId,currentSize);
+
+            rc = pthread_cond_broadcast(&cbNotEmpty);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                pthread_exit(&rc);
+            }
 
         rc = pthread_mutex_unlock(&currentSizeMutex);
         if (rc != 0) {
@@ -189,34 +227,47 @@ void* produce(void* t){
 
 
         numbersProduced[i] = number;
-        /*If the producer has finished producing the numbers we modify the variable
-         * Only ONE producer has to update the variable at the same time.
-         * Thus the reason we are doing it with mutex locked.
-         * */
-        if(numbers_to_produce == i+1){
-            printf("PRODUCER FINISHED \n");
-            producersFinished++;
-        }
-
-        rc = pthread_cond_broadcast(&cbNotEmpty);
-        if (rc != 0) {
-            printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-            pthread_exit(&rc);
-        }
 
 
-
-        rc = pthread_mutex_unlock(&producerMutex);
-        if (rc != 0) {
-            printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
-            pthread_exit(&rc);
-        }
         /********************************************/
     }
 
-    return (void*)"done";
-}
 
+    rc = pthread_mutex_lock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+    while(printCount != threadId){
+        printf("Producer %d: Waiting to print \n",threadId);
+        rc = pthread_cond_wait(&printingEnded, &print_mutex);
+        if (rc != 0) {
+            printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
+            pthread_exit(&rc);
+        }
+
+    }
+
+
+    printf("Producer %d: Fuckint printing ",threadId);
+
+    printCount ++;
+
+
+    rc = pthread_mutex_unlock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+
+
+
+    pthread_exit(t);
+}
 
 void* consume(void* t){
     int *threadId = (int *) t;
@@ -225,88 +276,180 @@ void* consume(void* t){
     int number;
     int i = 0;
     printf("Consumer %d:  Starting Consumption \n",*threadId);
-    while (popCount < numbers_to_produce*producers_count){
 
-        /* Checks if*/
+
+
+    // while true
+    while (1){
+        printf("WTF");
+        /* Insert into the buffer*/
         /********************************************/
-        rc = pthread_mutex_lock(&consumerMutex);
+        rc = pthread_mutex_lock(&cb_consumer_mutex);
         if (rc != 0) {
             printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
             pthread_exit(&rc);
         }
+                /* Current size is shared among producers and consumers thus it needs it's own mutex
+                 *
+                 * Popcount exists only in the consumers. Popcount is only updated inside the cv_consumer_mutex
+                 */
+                /********************************************/
+                rc = pthread_mutex_lock(&currentSizeMutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
 
 
-        /*Wait if the list is empty*/
-        while (currentSize == 0){
-            printf("Pop count is %d and total is %d",popCount, numbers_to_produce*producers_count);
-            printf("Consumer: %d: Is going to wait, Size is %d! \n",*threadId,currentSize);
-            rc = pthread_cond_wait(&cbNotEmpty, &consumerMutex);
-            if (rc != 0) {
-                printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
-                pthread_exit(&rc);
-            }
-        }
+
+                /*Wait if the list is empty*/
+                while (currentSize == 0 && popCount != producers_count*numbers_to_produce){
+                    printf("Pop count is %d and total is %d \n",popCount, numbers_to_produce*producers_count);
+                    printf("Consumer: %d: Is going to wait, Size is %d! \n",*threadId,currentSize);
+
+                    rc = pthread_mutex_unlock(&currentSizeMutex);
+                    if (rc != 0) {
+                        printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+                        pthread_exit(&rc);
+                    }
 
 
-        rc = pthread_mutex_unlock(&consumerMutex);
+                    rc = pthread_cond_wait(&cbNotEmpty, &cb_consumer_mutex);
+                    if (rc != 0) {
+                        printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
+                        pthread_exit(&rc);
+                    }
+
+
+
+                    rc = pthread_mutex_lock(&currentSizeMutex);
+                    if (rc != 0) {
+                        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+                        pthread_exit(&rc);
+                    }
+                }
+
+                /* if the while condition is false currentSizeMutex would not be unlocked
+                 * So we unlock it now
+                 * */
+                rc = pthread_mutex_unlock(&currentSizeMutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+
+                /*Avoiding the fact that consumer n finished the process and other consumers where waiting for their turn to leave
+                 * the while loop.
+                 * */
+                printf("%d %d",popCount, numbers_to_produce*producers_count);
+
+                if(popCount == numbers_to_produce*producers_count){
+
+                    rc = pthread_mutex_unlock(&cb_consumer_mutex);
+                    if (rc != 0) {
+                        printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+                        pthread_exit(&rc);
+                    }
+
+
+                    break;
+                }
+                /********************************************/
+
+        /*Pop only comes when the list is not empty. Thus there will be no conflict with the producers
+         * or with other consumers.
+         * */
+        cb_pop_front(cb,&number);
+
+
+        printf("Consumer: %d: Poped number %d! \n",*threadId,number);
+
+
+        /*Update the pop count for all the consumers*/
+        popCount++;
+
+
+        rc = pthread_mutex_unlock(&cb_consumer_mutex);
         if (rc != 0) {
             printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
             pthread_exit(&rc);
         }
         /********************************************/
 
-
-        /* Insert into the buffer*/
+        /*We have finished inserting but now we need to update the current size
+         * We reuse a lock for this
+         * */
         /********************************************/
-        rc = pthread_mutex_lock(&consumerMutex);
+        rc = pthread_mutex_lock(&currentSizeMutex);
         if (rc != 0) {
             printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
             pthread_exit(&rc);
         }
 
-        cb_pop_front(cb,&number);
-        printf("Consumer: %d: Poped number %d! \n",*threadId,number);
-        numbersExtracted[i] = number;
-        popCount++; /* Pop count is used only by the consumers. So it's safe to update it here*/
+        currentSize--;
 
-                        /*Decrease current size. Since producer is using it as well we need mutex*/
-                        /********************************************/
-                        rc = pthread_mutex_lock(&currentSizeMutex);
-                        if (rc != 0) {
-                            printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-                            pthread_exit(&rc);
-                        }
-
-
-                        currentSize--;
-                        printf("Consumer: %d: Current size is %d! \n",*threadId,currentSize);
-
-
-                        rc = pthread_mutex_unlock(&currentSizeMutex);
-                        if (rc != 0) {
-                            printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
-                            pthread_exit(&rc);
-                        }
-                        /********************************************/
-        /* Broadcast that the list is not full */
-        /********************************************/
+        /*we broadcast to all of the threads. An alrternative would have been
+         * pthread_cond_signal
+         * */
         rc = pthread_cond_broadcast(&cbNotFull);
         if (rc != 0) {
             printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
             pthread_exit(&rc);
         }
-        /********************************************/
 
-        rc = pthread_mutex_unlock(&consumerMutex);
+        rc = pthread_mutex_unlock(&currentSizeMutex);
         if (rc != 0) {
             printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
             pthread_exit(&rc);
         }
         /********************************************/
 
+        /*Not thread shared. Each consumer has it's own unique array. No need for a mutex*/
+        numbersExtracted[i] = number;
     }
 
-    return (void*)"done";
+
+
+
+    printf("\nCONSUMER GOT OUT\n");
+
+
+    int consId = *threadId;
+    consId += producers_count;
+    rc = pthread_mutex_lock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+    printf("Consumer %d: Done %d",*threadId,consumers_count);
+    if(*threadId == consumers_count){
+        printCount++;
+    }
+
+    while(printCount != consId){
+        printf("Consumer %d: Waiting to print",*threadId);
+        rc = pthread_cond_wait(&printingEnded, &print_mutex);
+        if (rc != 0) {
+            printf("ERROR: return code from pthread_cond_wait() is %d\n", rc);
+            pthread_exit(&rc);
+        }
+
+    }
+
+
+    printf("Consumer %d: Fucking printing",*threadId);
+
+    printCount ++;
+
+    rc = pthread_mutex_unlock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_unlock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+
+    pthread_exit(t);
 }
 
 
@@ -341,7 +484,7 @@ void main(int argc, char *argv[]){
     }
 
     producers_count = atoi(argv[1]);
-    int consumers_count = atoi(argv[2]);
+    consumers_count = atoi(argv[2]);
     buffer_size = atoi(argv[3]);
     numbers_to_produce = atoi(argv[4]);
     int seed = atoi(argv[5]);
@@ -356,23 +499,36 @@ void main(int argc, char *argv[]){
     /*Initialize mutex and condition*/
 
     /********************************************/
-    rc = pthread_mutex_init(&producerMutex,NULL);
-    if (rc != 0) {
-        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-        pthread_exit(&rc);
-    }
-
-    rc = pthread_mutex_init(&consumerMutex,NULL);
-    if (rc != 0) {
-        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-        pthread_exit(&rc);
-    }
-
     rc = pthread_mutex_init(&currentSizeMutex,NULL);
     if (rc != 0) {
         printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
         pthread_exit(&rc);
     }
+
+    rc = pthread_mutex_init(&popout_mutex,NULL);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    rc = pthread_mutex_init(&cb_producer_mutex,NULL);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    rc = pthread_mutex_init(&cb_consumer_mutex,NULL);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    rc = pthread_mutex_init(&print_mutex,NULL);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
 
     rc = pthread_cond_init(&cbNotEmpty, NULL);
     if (rc != 0) {
@@ -386,6 +542,11 @@ void main(int argc, char *argv[]){
         exit(-1);
     }
 
+    rc = pthread_cond_init(&printingEnded, NULL);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_cond_init() is %d\n", rc);
+        exit(-1);
+    }
     /********************************************/
 
 
@@ -415,6 +576,9 @@ void main(int argc, char *argv[]){
         producersParameters[j].numbers_to_produce = numbers_to_produce;
         producersParameters[j].seed = seed *j+1;
     }
+
+    producer_numbers_to_output = malloc(numbers_to_produce* sizeof(int));
+
     /********************************************/
 
 
@@ -490,6 +654,8 @@ void main(int argc, char *argv[]){
 
 
     cb_free(cb);
+
+    free(producer_numbers_to_output);
 
 }
 

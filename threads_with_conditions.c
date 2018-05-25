@@ -194,6 +194,10 @@ int main(int argc, char *argv[]) {
        		exit(-1);
 	}
 
+
+
+
+
 	//arxikopoiisi olwn twn threads
   	rc = pthread_create(&threads[0], NULL, doubleCountVariable, &t1);
 	if (rc != 0) {
