@@ -4,7 +4,7 @@
 
 #include <pthread.h>
 #include <tgmath.h>
-#include "prodcons3.h"
+#include "p3140076-p3140092-p3140219-prodcons-common.c"
 
 circular_buffer* cb;
 pthread_mutex_t print_mutex;
@@ -19,6 +19,7 @@ pthread_cond_t cbNotEmpty;
 pthread_cond_t cbNotFull;
 pthread_cond_t printingEnded;
 
+
 pthread_mutex_t execution_ended;
 pthread_cond_t execution_ended_signal;
 
@@ -30,104 +31,8 @@ int numbers_to_produce;
 int* producer_numbers_to_output;
 int popCount = 0;
 
-int currentSize = 0;
 int buffer_size;
 int consumers_count;
-int consumers_got_out=0;
-int bufferFull = 0;
-typedef struct producerParameters{
-    int threadId;
-    int numbers_to_produce;
-    int seed;
-} producerParameters;
-
-
-
-//initialize circular buffer
-//capacity: maximum number of elements in the buffer
-//sz: size of each element
-void cb_init(circular_buffer *cb, size_t capacity, size_t sz)
-{
-    cb->buffer = malloc(capacity * sz);
-
-    if(cb->buffer == NULL){
-        printf("Could not allocate memory..Exiting! \n");
-        exit(1);
-    }
-    // handle error
-    cb->buffer_end = (char *)cb->buffer + capacity * sz;
-    cb->capacity = capacity;
-    cb->count = 0;
-    cb->sz = sz;
-    cb->head = cb->buffer;
-    cb->tail = cb->buffer;
-}
-
-//destroy circular buffer
-void cb_free(circular_buffer *cb)
-{
-    free(cb->buffer);
-    // clear out other fields too, just to be safe
-}
-
-//add item to circular buffer
-void cb_push_back(circular_buffer *cb, const void *item)
-{
-    if(cb->count == cb->capacity)
-    {
-        printf("Access violation. Buffer is full\n");
-        exit(1);
-    }
-    memcpy(cb->head, item, cb->sz);
-    cb->head = (char*)cb->head + cb->sz;
-    if(cb->head == cb->buffer_end)
-        cb->head = cb->buffer;
-    cb->count++;
-}
-
-//remove first item from circular item
-void cb_pop_front(circular_buffer *cb, void *item)
-{
-    if(cb->count == 0)
-    {
-        printf("Access violation. Buffer is empy\n");
-        exit(1);
-    }
-    memcpy(item, cb->tail, cb->sz);
-    cb->tail = (char*)cb->tail + cb->sz;
-    if(cb->tail == cb->buffer_end)
-        cb->tail = cb->buffer;
-    cb->count--;
-}
-
-void clearFiles(){
-    fflush(fopen("prod_in.txt", "w"));
-    fflush(fopen("prod_out.txt", "w"));
-}
-
-void writeToFile(char* str, char* filename){
-
-
-    FILE* fp;
-    int x = 10;
-    //printf("%s",filename);
-    fp = fopen(filename, "a");
-    if(fp == NULL) {
-        printf("IN NULL");
-        //fp = fopen(filename, "w+");
-        exit(-1);
-    }
-    fprintf(fp,"%s",str);
-    fflush(fp);
-
-}
-
-void printArguments(int argc, char* argv[]){
-    int i = 0;
-    for (i = 0; i < argc; i++)
-        printf("\n%s", argv[i]);
-}
-
 
 void* produce(void* t){
     producerParameters* parametersInfo = (producerParameters*)t;
@@ -214,8 +119,8 @@ void* produce(void* t){
         }
         /********************************************/
     }
-
-
+//
+//
 //    rc = pthread_mutex_lock(&execution_ended);
 //    if (rc != 0) {
 //        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
@@ -404,7 +309,7 @@ void* consume(void* t){
             pthread_exit(&rc);
         }
 
-        writeToFile(conc,"prod_out.txt");
+        writeToFile(conc,"cons_out.txt");
 
         rc = pthread_mutex_unlock(&write_prod_out_mutex);
         if (rc != 0) {
@@ -416,7 +321,7 @@ void* consume(void* t){
 
     //printf("Consumer %d: GOT OUT! \n",*threadId);
 
-
+//
 //
 //    rc = pthread_mutex_lock(&execution_ended);
 //    if (rc != 0) {
@@ -515,13 +420,13 @@ void main(int argc, char *argv[]){
      * We use 6 cause the program name is a parameter as well.
      */
     if(argc!=6){
-        printf("Wrong number of arguments");
+        printf("Wrong number of arguments\n");
         exit(1);
     }
 
     /*Check if the buffer size is valid*/
-    if(atoi(argv[3])<10){
-        printf("Buffer size not largest than 10!");
+    if(atoi(argv[3])<=10){
+        printf("Buffer size not largest than 10!\n");
         exit(1);
     }
 
@@ -533,19 +438,19 @@ void main(int argc, char *argv[]){
 
 
     if(numbers_to_produce == 0 ){
-        printf("Numbers to produce are 0. Program finished!");
+        printf("Numbers to produce are 0. Program finished! \n");
         exit(1);
 
     }
 
 
     if(producers_count <= 0){
-        printf("You must specify at least one producer!");
+        printf("You must specify at least one producer!\n");
         exit(1);
     }
 
     if(consumers_count <= 0){
-        printf("You must specify at least one consumer!");
+        printf("You must specify at least one consumer!\n");
         exit(1);
     }
 
