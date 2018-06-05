@@ -515,13 +515,13 @@ void main(int argc, char *argv[]){
      * We use 6 cause the program name is a parameter as well.
      */
     if(argc!=6){
-        printf("Wrong number of arguments");
+        printf("Wrong number of arguments\n");
         exit(1);
     }
 
     /*Check if the buffer size is valid*/
-    if(atoi(argv[3])<10){
-        printf("Buffer size not largest than 10!");
+    if(atoi(argv[3])<=10){
+        printf("Buffer size not largest than 10!\n");
         exit(1);
     }
 
@@ -533,19 +533,19 @@ void main(int argc, char *argv[]){
 
 
     if(numbers_to_produce == 0 ){
-        printf("Numbers to produce are 0. Program finished!");
+        printf("Numbers to produce are 0. Program finished!\n");
         exit(1);
 
     }
 
 
     if(producers_count <= 0){
-        printf("You must specify at least one producer!");
+        printf("You must specify at least one producer!\n");
         exit(1);
     }
 
     if(consumers_count <= 0){
-        printf("You must specify at least one consumer!");
+        printf("You must specify at least one consumer!\n");
         exit(1);
     }
 
@@ -705,7 +705,7 @@ void main(int argc, char *argv[]){
             exit(-1);
         }
 
-        //printf("Main: Producer %d returned %s as status code.\n", producersParameters[threadCount].threadId, (char *)status);
+        printf("Main: Producer %d returned %d as status code.\n", producersParameters[threadCount].threadId, *(int *)status);
     }
 
     for ( int threadCount = 0; threadCount < consumers_count; threadCount++) {
@@ -716,7 +716,7 @@ void main(int argc, char *argv[]){
             exit(-1);
         }
 
-        //printf("Main: Consumer %d returned %s as status code.\n", t_consumers[threadCount], (char *)status);
+        printf("Main: Consumer %d returned %d as status code.\n", t_consumers[threadCount], *(int *)status);
     }
 
 
