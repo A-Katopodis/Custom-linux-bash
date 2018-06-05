@@ -7,6 +7,10 @@
 #include "prodcons3.h"
 
 circular_buffer* cb;
+pthread_mutex_t currentSizeMutex;
+pthread_mutex_t cb_consumer_mutex;
+pthread_mutex_t cb_producer_mutex;
+pthread_mutex_t popout_mutex;
 pthread_mutex_t print_mutex;
 pthread_mutex_t cb_mutex;
 
@@ -18,6 +22,9 @@ pthread_mutex_t write_prod_out_mutex;
 pthread_cond_t cbNotEmpty;
 pthread_cond_t cbNotFull;
 pthread_cond_t printingEnded;
+
+pthread_cond_t print_cond_consumers;
+pthread_cond_t print_cond_producers;
 
 pthread_mutex_t execution_ended;
 pthread_cond_t execution_ended_signal;
@@ -214,8 +221,8 @@ void* produce(void* t){
         }
         /********************************************/
     }
-
-
+//
+//
 //    rc = pthread_mutex_lock(&execution_ended);
 //    if (rc != 0) {
 //        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
@@ -416,7 +423,7 @@ void* consume(void* t){
 
     //printf("Consumer %d: GOT OUT! \n",*threadId);
 
-
+//
 //
 //    rc = pthread_mutex_lock(&execution_ended);
 //    if (rc != 0) {

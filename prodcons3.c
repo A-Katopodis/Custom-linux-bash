@@ -19,6 +19,7 @@ pthread_cond_t cbNotEmpty;
 pthread_cond_t cbNotFull;
 pthread_cond_t printingEnded;
 
+
 pthread_mutex_t execution_ended;
 pthread_cond_t execution_ended_signal;
 
@@ -28,13 +29,11 @@ int number_of_threads;
 int producers_count;
 int numbers_to_produce;
 int* producer_numbers_to_output;
-int popCount = 0;
+int popCount = 0; // common shared variable for all the consumers.
 
-int currentSize = 0;
 int buffer_size;
 int consumers_count;
-int consumers_got_out=0;
-int bufferFull = 0;
+
 typedef struct producerParameters{
     int threadId;
     int numbers_to_produce;
@@ -122,11 +121,6 @@ void writeToFile(char* str, char* filename){
 
 }
 
-void printArguments(int argc, char* argv[]){
-    int i = 0;
-    for (i = 0; i < argc; i++)
-        printf("\n%s", argv[i]);
-}
 
 
 void* produce(void* t){
@@ -216,90 +210,90 @@ void* produce(void* t){
     }
 
 
-//    rc = pthread_mutex_lock(&execution_ended);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//    threads_done++;
-//    if(threads_done == number_of_threads){
-//        rc = pthread_cond_broadcast(&execution_ended_signal);
-//        if (rc != 0) {
-//            printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//            pthread_exit(&rc);
-//        }
-//    }else{
-//        while(threads_done != number_of_threads){
-//           // printf("Producer %d: Is going to wait execution ending! \n",threadId);
-//            printCount=1;
-//            rc = pthread_cond_wait(&execution_ended_signal, &execution_ended);
-//            if (rc != 0) {
-//                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                pthread_exit(&rc);
-//            }
-//        }
-//    }
-//
-//   // printf("Producer %d: Execution ending received \n",threadId);
-//
-//
-//
-//
-//    rc = pthread_mutex_unlock(&execution_ended);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//
-//    rc = pthread_mutex_lock(&print_mutex);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//
-//
-//
-//    while(1){
-//        if(printCount == threadId){
-//
-//            printf("Producer %d: ",threadId);
-//
-//            for (int i = 0; i < numbers_to_produce -1; ++i) {
-//                printf("%d, ",numbersProduced[i]);
-//            }
-//
-//            if(numbers_to_produce >0){
-//                printf("%d",numbersProduced[numbers_to_produce-1]);
-//            }
-//            printf("\n");
-//
-//            printCount++;
-//            rc = pthread_cond_broadcast(&printingEnded);
-//            if (rc != 0) {
-//                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                pthread_exit(&rc);
-//            }
-//            break;
-//        }else{
-//            while(printCount != threadId){
-//                //printf("Producer %d: Is going to wait to print! \n",threadId);
-//                rc = pthread_cond_wait(&printingEnded, &print_mutex);
-//                if (rc != 0) {
-//                    printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                    pthread_exit(&rc);
-//                }
-//            }
-//        }
-//    }
-//
-//    rc = pthread_mutex_unlock(&print_mutex);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
+    rc = pthread_mutex_lock(&execution_ended);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    threads_done++;
+    if(threads_done == number_of_threads){
+        rc = pthread_cond_broadcast(&execution_ended_signal);
+        if (rc != 0) {
+            printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+            pthread_exit(&rc);
+        }
+    }else{
+        while(threads_done != number_of_threads){
+           // printf("Producer %d: Is going to wait execution ending! \n",threadId);
+            printCount=1;
+            rc = pthread_cond_wait(&execution_ended_signal, &execution_ended);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+        }
+    }
+
+   // printf("Producer %d: Execution ending received \n",threadId);
+
+
+
+
+    rc = pthread_mutex_unlock(&execution_ended);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+    rc = pthread_mutex_lock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+
+
+    while(1){
+        if(printCount == threadId){
+
+            printf("Producer %d: ",threadId);
+
+            for (int i = 0; i < numbers_to_produce -1; ++i) {
+                printf("%d, ",numbersProduced[i]);
+            }
+
+            if(numbers_to_produce >0){
+                printf("%d",numbersProduced[numbers_to_produce-1]);
+            }
+            printf("\n");
+
+            printCount++;
+            rc = pthread_cond_broadcast(&printingEnded);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+            break;
+        }else{
+            while(printCount != threadId){
+                //printf("Producer %d: Is going to wait to print! \n",threadId);
+                rc = pthread_cond_wait(&printingEnded, &print_mutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+            }
+        }
+    }
+
+    rc = pthread_mutex_unlock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
     pthread_exit(t);
 }
 
@@ -417,88 +411,88 @@ void* consume(void* t){
     //printf("Consumer %d: GOT OUT! \n",*threadId);
 
 
-//
-//    rc = pthread_mutex_lock(&execution_ended);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//    threads_done++;
-//    if(threads_done == number_of_threads){
-//        rc = pthread_cond_broadcast(&execution_ended_signal);
-//        if (rc != 0) {
-//            printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//            pthread_exit(&rc);
-//        }
-//    }else{
-//        while(threads_done != number_of_threads){
-//            //printf("Consumer %d: Is going to wait the execution end! \n",*threadId);
-//
-//            rc = pthread_cond_wait(&execution_ended_signal, &execution_ended);
-//            if (rc != 0) {
-//                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                pthread_exit(&rc);
-//            }
-//        }
-//    }
-//
-//    //printf("Consumer %d: Execution ending received \n",*threadId);
-//
-//    rc = pthread_mutex_unlock(&execution_ended);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//
-//    rc = pthread_mutex_lock(&print_mutex);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
-//
-//    while (1){
-//        if(printCount == *threadId + producers_count){
-//
-//            printf("Consumer %d: ",*threadId);
-//
-//            for (int j = 0; j < i -1; ++j) {
-//                printf("%d, ",numbersExtracted[j]);
-//            }
-//
-//            if(i >0){
-//                printf("%d",numbersExtracted[i-1]);
-//            }
-//            printf("\n");
-//
-//
-//
-//
-//            printCount++;
-//            rc = pthread_cond_broadcast(&printingEnded);
-//            if (rc != 0) {
-//                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                pthread_exit(&rc);
-//            }
-//            break;
-//        }else{
-//            while(printCount != *threadId + producers_count){
-//                //printf("Consumer %d: Is going to wait to print! \n",*threadId);
-//                rc = pthread_cond_wait(&printingEnded, &print_mutex);
-//                if (rc != 0) {
-//                    printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
-//                    pthread_exit(&rc);
-//                }
-//            }
-//        }
-//    }
-//
-//    rc = pthread_mutex_unlock(&print_mutex);
-//    if (rc != 0) {
-//        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
-//        pthread_exit(&rc);
-//    }
+
+    rc = pthread_mutex_lock(&execution_ended);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    threads_done++;
+    if(threads_done == number_of_threads){
+        rc = pthread_cond_broadcast(&execution_ended_signal);
+        if (rc != 0) {
+            printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+            pthread_exit(&rc);
+        }
+    }else{
+        while(threads_done != number_of_threads){
+            //printf("Consumer %d: Is going to wait the execution end! \n",*threadId);
+
+            rc = pthread_cond_wait(&execution_ended_signal, &execution_ended);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+        }
+    }
+
+    //printf("Consumer %d: Execution ending received \n",*threadId);
+
+    rc = pthread_mutex_unlock(&execution_ended);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+
+    rc = pthread_mutex_lock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
+
+    while (1){
+        if(printCount == *threadId + producers_count){
+
+            printf("Consumer %d: ",*threadId);
+
+            for (int j = 0; j < i -1; ++j) {
+                printf("%d, ",numbersExtracted[j]);
+            }
+
+            if(i >0){
+                printf("%d",numbersExtracted[i-1]);
+            }
+            printf("\n");
+
+
+
+
+            printCount++;
+            rc = pthread_cond_broadcast(&printingEnded);
+            if (rc != 0) {
+                printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                pthread_exit(&rc);
+            }
+            break;
+        }else{
+            while(printCount != *threadId + producers_count){
+                //printf("Consumer %d: Is going to wait to print! \n",*threadId);
+                rc = pthread_cond_wait(&printingEnded, &print_mutex);
+                if (rc != 0) {
+                    printf("ERROR: return code from pthread_cond_broadcast() is %d\n", rc);
+                    pthread_exit(&rc);
+                }
+            }
+        }
+    }
+
+    rc = pthread_mutex_unlock(&print_mutex);
+    if (rc != 0) {
+        printf("ERROR: return code from pthread_mutex_lock() is %d\n", rc);
+        pthread_exit(&rc);
+    }
     pthread_exit(t);
 }
 
